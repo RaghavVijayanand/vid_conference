@@ -31,3 +31,5 @@ Thumbs.db
 # Optional: ignore local certificates
 cert.pem
 key.pem
+cert.pem
+key.pem

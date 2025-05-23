@@ -29,8 +29,6 @@ Thumbs.db
 .idea/
 
 # Optional: ignore local certificates
-cert.pem
-key.pem
-cert.pem
-key.pem
-node_modules/
+# cert.pem
+# key.pem
+*.pem

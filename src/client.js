@@ -1,7 +1,25 @@
 import * as mediasoupClient from 'mediasoup-client';
 
-// Explicitly connect to the backend Socket.IO server over HTTPS
-const socket = io('https://192.168.2.7:3000', { transports: ['websocket'] });
+// Connect to the backend Socket.IO server with fallback transports
+const socket = io('https://localhost:3000', { 
+    transports: ['websocket', 'polling'],
+    forceNew: true,
+    reconnection: true,
+    timeout: 5000
+});
+
+// Add connection debugging
+socket.on('connect', () => {
+    console.log('Connected to server with socket ID:', socket.id);
+});
+
+socket.on('disconnect', () => {
+    console.log('Disconnected from server');
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+});
 
 const joinBtn = document.getElementById('joinBtn');
 const videosDiv = document.getElementById('videos');
@@ -124,14 +142,20 @@ joinBtn.onclick = async () => {
         for (const track of localStream.getTracks()) {
             const producer = await sendTransport.produce({ track });
             producers.push(producer);
-        }
-        // NEW: Consume existing producers
+        }        // NEW: Consume existing producers
+        console.log('Checking for existing producers...');
         const existingProducers = await new Promise(res => socket.emit('getProducers', res));
+        console.log('Existing producers:', existingProducers);
         for (const { socketId, producerId, kind } of existingProducers) {
             if (!device) continue;
+            console.log('Consuming existing producer:', { socketId, producerId, kind });
             const rtpCapabilities = device.rtpCapabilities;
             const consumerInfo = await new Promise(res => socket.emit('consume', { producerId, rtpCapabilities }, res));
-            if (consumerInfo.error) continue;
+            if (consumerInfo.error) {
+                console.error('Failed to consume existing producer:', consumerInfo.error);
+                continue;
+            }
+            console.log('Consumer info for existing producer:', consumerInfo);
             // Use recvTransport for consuming
             const consumer = await recvTransport.consume({
                 id: consumerInfo.id,
@@ -140,6 +164,7 @@ joinBtn.onclick = async () => {
                 rtpParameters: consumerInfo.rtpParameters,
             });
             await consumer.resume();
+            console.log('Existing producer consumer created:', consumer.id);
             const remoteStream = new MediaStream([consumer.track]);
             addVideo(remoteStream, socketId);
         }
@@ -153,11 +178,20 @@ joinBtn.onclick = async () => {
 
 // Listen for new producers from other peers
 socket.on('newProducer', async ({ socketId, producerId, kind }) => {
-    if (!device) return;
+    console.log('New producer detected:', { socketId, producerId, kind });
+    if (!device) {
+        console.log('Device not ready yet');
+        return;
+    }
     const rtpCapabilities = device.rtpCapabilities;
     // Ask server to create a consumer
+    console.log('Requesting consumer for producer:', producerId);
     const consumerInfo = await new Promise(res => socket.emit('consume', { producerId, rtpCapabilities }, res));
-    if (consumerInfo.error) return;
+    if (consumerInfo.error) {
+        console.error('Failed to create consumer:', consumerInfo.error);
+        return;
+    }
+    console.log('Consumer info received:', consumerInfo);
     // Use recvTransport for consuming
     const consumer = await recvTransport.consume({
         id: consumerInfo.id,
@@ -166,6 +200,7 @@ socket.on('newProducer', async ({ socketId, producerId, kind }) => {
         rtpParameters: consumerInfo.rtpParameters,
     });
     await consumer.resume();
+    console.log('Consumer created and resumed:', consumer.id);
     const remoteStream = new MediaStream([consumer.track]);
     addVideo(remoteStream, socketId);
     showToast('A new participant joined!');

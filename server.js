@@ -10,7 +10,12 @@ const server = https.createServer({
   key: fs.readFileSync('key.pem'),
   cert: fs.readFileSync('cert.pem')
 }, app);
-const io = socketIo(server);
+const io = socketIo(server, {
+  cors: {
+    origin: ["https://localhost:5173", "https://192.168.31.214:5173"],
+    methods: ["GET", "POST"]
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 
@@ -64,11 +69,10 @@ io.on('connection', (socket) => {
   socket.on('getRtpCapabilities', (cb) => {
     cb(router.rtpCapabilities);
   });
-
   socket.on('createWebRtcTransport', async (cb) => {
     try {
       const transport = await router.createWebRtcTransport({
-        listenIps: [{ ip: '0.0.0.0', announcedIp: '192.168.2.7' }],
+        listenIps: [{ ip: '0.0.0.0', announcedIp: '192.168.31.214' }],
         enableUdp: true,
         enableTcp: true,
         preferUdp: true,
@@ -140,11 +144,10 @@ io.on('connection', (socket) => {
     }
     cb(producerList);
   });
-
   socket.on('createRecvTransport', async (cb) => {
     try {
       const transport = await router.createWebRtcTransport({
-        listenIps: [{ ip: '0.0.0.0', announcedIp: '192.168.2.7' }],
+        listenIps: [{ ip: '0.0.0.0', announcedIp: '192.168.31.214' }],
         enableUdp: true,
         enableTcp: true,
         preferUdp: true,
@@ -169,7 +172,7 @@ io.on('connection', (socket) => {
 
 startMediasoup().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-    console.log('If you are on a LAN, open http://YOUR_LAN_IP:3000 on other devices.');
+    console.log(`Server running on https://0.0.0.0:${PORT}`);
+    console.log('If you are on a LAN, open https://YOUR_LAN_IP:3000 on other devices.');
   });
 }); 
